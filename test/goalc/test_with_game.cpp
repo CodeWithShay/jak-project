@@ -374,6 +374,9 @@ TEST_F(WithGameTests, GameCount) {
   shared_compiler->compiler.run_test_from_string("(dgo-load \"game\" global #xf #x200000)");
   shared_compiler->runner.run_static_test(env, testCategory, "test-game-count.gc",
                                           get_test_pass_string("game-count", 4));
+  // don't leave behind a weird version of the game-count file.
+  std::filesystem::remove(file_util::get_file_path({"out", "iso", "GAME.CGO"}));
+  std::filesystem::remove(file_util::get_file_path({"out", "obj", "game-cnt.go"}));
 }
 
 TEST_F(WithGameTests, BitFieldAccess) {
@@ -872,8 +875,24 @@ TEST_F(WithGameTests, GetEnumVals) {
 }
 
 TEST_F(WithGameTests, SetU64FromFloat) {
-  shared_compiler->runner.run_static_test(env, testCategory, "test-set-u64-from-float.gc",
-                                          {"-12.0000 #xc1400000 #xc1400000 #x0\n0\n"});
+  shared_compiler->runner.run_static_test(
+      env, testCategory, "test-set-u64-from-float.gc",
+      {"-12.0000 #xffffffffc1400000 #xc1400000 #xffffffff\n0\n"});
+}
+
+TEST_F(WithGameTests, TrickyFloatBehavior) {
+  shared_compiler->runner.run_static_test(env, testCategory, "tricky-floats.gc",
+                                          {"#x80000000 1.0000 #xffffffffbf800000\n0\n"});
+}
+
+TEST_F(WithGameTests, ProcessAllocation) {
+  shared_compiler->runner.run_static_test(env, testCategory, "test-kernel-alloc.gc",
+                                          {"diff is 16\n0\n"});
+}
+
+TEST_F(WithGameTests, MethodCallForwardDeclared) {
+  shared_compiler->runner.run_static_test(env, testCategory, "test-forward-declared-method.gc",
+                                          {"4 12\n0\n"});
 }
 
 TEST(TypeConsistency, TypeConsistency) {

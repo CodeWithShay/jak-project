@@ -5,6 +5,32 @@
 ;; name in dgo: drawable
 ;; dgos: GAME, ENGINE
 
+(defun real-main-draw-hook ()
+  (when *slow-frame-rate*
+    (dotimes (v1-2 #xc3500)
+      (nop!)
+      (nop!)
+      (nop!)
+      (nop!)
+      (nop!)
+      (nop!)
+      )
+    )
+  "Function to be executed to set up for engine dma"
+  ;; lots more in this function.
+  (when *debug-segment*
+    (debug-draw-actors *level* *display-actor-marks*)
+    )
+  )
+
+(defun main-draw-hook ()
+  "Nice."
+  (real-main-draw-hook)
+  (none)
+  )
+
+(define *draw-hook* main-draw-hook)
+
 (defun debug-init-buffer ((arg0 bucket-id) (arg1 gs-zbuf) (arg2 gs-test))
   "Initialize a bucket for debug draw with the given zbuf and test settings"
   (let* ((t0-0 (-> *display* frames (-> *display* on-screen) frame global-buf))
@@ -469,18 +495,18 @@
             )
           )
         ;;(cpu-usage)
-          (__send-gfx-dma-chain (the-as dma-bank-source #x10009000)
-                                 (cond
-                                   ;; some buffer for debugging, not used
-                                   (*surrogate-dma-buffer*
-                                    *surrogate-dma-buffer*
-                                    )
-                                   (else
-                                    (-> dma-buf-to-send data-buffer)
-                                    )
-                                   )
+        (__send-gfx-dma-chain (the-as dma-bank-source #x10009000)
+                               (cond
+                                 ;; some buffer for debugging, not used
+                                 (*surrogate-dma-buffer*
+                                  *surrogate-dma-buffer*
+                                  )
+                                 (else
+                                  (-> dma-buf-to-send data-buffer)
+                                  )
                                  )
-          )
+                               )
+        )
       )
 
     (determine-pause-mode)
@@ -505,4 +531,13 @@
    to-draw frame"
   (display-frame-finish disp)
   (display-sync disp) ;; also starts next
+  )
+
+;; TODO stub
+(defun dma-add-process-drawable-hud ((arg0 process-drawable) (arg1 draw-control) (arg2 symbol) (arg3 dma-buffer))
+  (set! (-> arg1 status) (logand -9 (-> arg1 status)))
+  (when (zero? (logand (-> arg1 status) 22))
+   (logior! (-> arg1 status) 8)
+   )
+  (none)
   )

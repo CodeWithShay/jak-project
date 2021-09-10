@@ -13,6 +13,7 @@ enum class BucketId {
   BUCKET0 = 0,
   BUCKET1 = 1,
   // ...
+  SPRITE = 66,
   DEBUG_DRAW_0 = 67,
   DEBUG_DRAW_1 = 68,
   MAX_BUCKETS = 69
@@ -41,10 +42,14 @@ class BucketRenderer {
   virtual void render(DmaFollower& dma, SharedRenderState* render_state) = 0;
   std::string name_and_id() const;
   virtual ~BucketRenderer() = default;
+  bool& enabled() { return m_enabled; }
+  virtual bool empty() const { return false; }
+  virtual void draw_debug_window() {}
 
  protected:
   std::string m_name;
   BucketId m_my_id;
+  bool m_enabled = true;
 };
 
 /*!
@@ -54,4 +59,5 @@ class EmptyBucketRenderer : public BucketRenderer {
  public:
   EmptyBucketRenderer(const std::string& name, BucketId my_id);
   void render(DmaFollower& dma, SharedRenderState* render_state) override;
+  bool empty() const override { return true; }
 };

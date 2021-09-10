@@ -6,7 +6,7 @@
 ;; dgos: GAME, ENGINE
 
 ;; TODO - for water-anim | sunken-elevator
-(define-extern ja-post (function int))
+(define-extern ja-post (function none :behavior process-drawable))
 ;; TODO - for rigid-body
 (define-extern rider-post (function int))
 (define-extern transform-post (function int))
@@ -24,3 +24,5 @@
 (define-extern ja-eval (function int))
 ;; TODO - for basebutton
 (define-extern anim-loop (function symbol))
+;; TODO - for bouncer
+(define-extern ja-min? (function int symbol))

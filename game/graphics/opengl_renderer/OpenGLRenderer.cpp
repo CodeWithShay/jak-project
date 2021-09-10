@@ -3,6 +3,7 @@
 #include "common/log/log.h"
 #include "game/graphics/pipelines/opengl.h"
 #include "game/graphics/opengl_renderer/DirectRenderer.h"
+#include "third-party/imgui/imgui.h"
 
 // for the vif callback
 #include "game/kernel/kmachine.h"
@@ -54,6 +55,7 @@ void OpenGLRenderer::init_bucket_renderers() {
   init_bucket_renderer<EmptyBucketRenderer>("bucket0", BucketId::BUCKET0);
 
   // TODO what the heck is drawing to debug-draw-0 on init?
+  init_bucket_renderer<DirectRenderer>("sprite", BucketId::SPRITE, 102);
   init_bucket_renderer<DirectRenderer>("debug-draw-0", BucketId::DEBUG_DRAW_0, 102);
   init_bucket_renderer<DirectRenderer>("debug-draw-1", BucketId::DEBUG_DRAW_1, 102);
 
@@ -73,6 +75,29 @@ void OpenGLRenderer::render(DmaFollower dma, int window_width_px, int window_hei
   // draw_test_triangle();
   // render the buckets!
   dispatch_buckets(dma);
+
+  draw_renderer_selection_window();
+  // add a profile bar for the imgui stuff
+  vif_interrupt_callback();
+}
+
+void OpenGLRenderer::draw_renderer_selection_window() {
+  ImGui::Begin("Renderer Debug");
+  for (size_t i = 0; i < m_bucket_renderers.size(); i++) {
+    auto renderer = m_bucket_renderers[i].get();
+    if (renderer && !renderer->empty()) {
+      ImGui::PushID(i);
+      if (ImGui::CollapsingHeader(renderer->name_and_id().c_str())) {
+        ImGui::Checkbox("Enable", &renderer->enabled());
+        renderer->draw_debug_window();
+      }
+      ImGui::PopID();
+    }
+  }
+  if (ImGui::CollapsingHeader("Texture Pool")) {
+    m_render_state.texture_pool->draw_debug_window();
+  }
+  ImGui::End();
 }
 
 /*!

@@ -84,6 +84,10 @@ TP_Type SimpleAtom::get_type(const TypeState& input,
         return TP_Type::make_from_ts(TypeSpec("pointer"));
       } else if (m_string == "enter-state") {
         return TP_Type::make_enter_state();
+      } else if (m_string == "run-function-in-process") {
+        return TP_Type::make_run_function_in_process_function();
+      } else if (m_string == "set-to-run" && env.func->guessed_name.to_string() != "enter-state") {
+        return TP_Type::make_set_to_run_function();
       }
 
       // look up the type of the symbol
@@ -228,6 +232,7 @@ TP_Type SimpleExpression::get_type(const TypeState& input,
     case Kind::SUBU_L32_S7:
       return TP_Type::make_from_ts("int");
     case Kind::VECTOR_3_DOT:
+    case Kind::VECTOR_4_DOT:
       return TP_Type::make_from_ts("float");
     default:
       throw std::runtime_error("Simple expression cannot get_type: " +
@@ -1203,6 +1208,33 @@ TypeState CallOp::propagate_types_internal(const TypeState& input,
     in_type = state_to_go_function(state_type);
   }
 
+  if (in_tp.kind == TP_Type::Kind::RUN_FUNCTION_IN_PROCESS_FUNCTION ||
+      in_tp.kind == TP_Type::Kind::SET_TO_RUN_FUNCTION) {
+    auto func_to_run_type = input.get(Register(Reg::GPR, arg_regs[1]));
+    auto func_to_run_ts = func_to_run_type.typespec();
+    if (func_to_run_ts.base_type() != "function" || func_to_run_ts.arg_count() == 0 ||
+        func_to_run_ts.arg_count() > 7) {
+      throw std::runtime_error(
+          fmt::format("Call to run-function-in-process or set-to-run at op {} with an invalid "
+                      "function type: {}",
+                      m_my_idx, func_to_run_type.print()));
+    }
+
+    std::vector<TypeSpec> new_arg_types;
+    if (in_tp.kind == TP_Type::Kind::RUN_FUNCTION_IN_PROCESS_FUNCTION) {
+      new_arg_types.push_back(TypeSpec("process"));
+    } else {
+      new_arg_types.push_back(TypeSpec("thread"));
+    }
+    new_arg_types.push_back(TypeSpec("function"));
+
+    for (size_t i = 0; i < func_to_run_ts.arg_count() - 1; i++) {
+      new_arg_types.push_back(func_to_run_ts.get_arg(i));
+    }
+    new_arg_types.push_back(TypeSpec("none"));
+    in_type = TypeSpec("function", new_arg_types);
+  }
+
   if (in_type.arg_count() < 1) {
     throw std::runtime_error("Called a function, but we do not know its type");
   }
@@ -1211,10 +1243,18 @@ TypeState CallOp::propagate_types_internal(const TypeState& input,
     // we're calling a varags function, which is format. We can determine the argument count
     // by looking at the format string, if we can get it.
     auto arg_type = input.get(Register(Reg::GPR, Reg::A1));
-    if (arg_type.is_constant_string() || arg_type.is_format_string()) {
+    auto can_determine_argc = arg_type.can_be_format_string();
+    auto dynamic_string = false;
+    if (!can_determine_argc && arg_type.typespec() == TypeSpec("string")) {
+      // dynamic string. use manual lookup table.
+      dynamic_string = true;
+    }
+    if (can_determine_argc || dynamic_string) {
       int arg_count = -1;
 
-      if (arg_type.is_constant_string()) {
+      if (dynamic_string) {
+        arg_count = dts.get_dynamic_format_arg_count(env.func->guessed_name.to_string(), m_my_idx);
+      } else if (arg_type.is_constant_string()) {
         auto& str = arg_type.get_string();
         arg_count = dts.get_format_arg_count(str);
       } else {
@@ -1254,7 +1294,8 @@ TypeState CallOp::propagate_types_internal(const TypeState& input,
 
       return end_types;
     } else {
-      throw std::runtime_error("Failed to get string for _varags_ call, got " + arg_type.print());
+      throw std::runtime_error("Failed to get appropriate string for _varags_ call, got " +
+                               arg_type.print());
     }
   }
   // set the call type!
