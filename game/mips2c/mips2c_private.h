@@ -598,7 +598,14 @@ struct ExecutionContext {
     if (in == 0) {
       return 32;
     }
-    return __builtin_clz(in);
+
+
+    #ifdef __linux__
+     return __builtin_clz(in);
+    #elif _WIN32
+      return __lzcnt(in);
+    #endif
+
   }
 
   void plzcw(int dst, int src) {
